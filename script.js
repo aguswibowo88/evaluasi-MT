@@ -894,7 +894,8 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
               values: yearList.map((year) => Math.round(((years.get(year) || 0) / 1e9) * 1000) / 1000),
             }))
             .filter((item) => item.total > 0)
-            .sort((a, b) => b.total - a.total);
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 6);
           if (!platforms.length || !yearList.length) return;
           const palette = ["#0F766E", "#D4AF37", "#334155"];
           const platformYearGrowthPlugin = {
@@ -1037,6 +1038,7 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
             }))
             .filter((item) => item.total > 0)
             .sort((a, b) => b.total - a.total)
+            .slice(0, 5)
             .map((item, index) => ({ ...item, color: palette[item.name] || fallback[index % fallback.length] }));
           const slaTitle = document.getElementById("slaTitle");
           if (slaTitle) slaTitle.textContent = "SERVICE LEVEL INDICATOR (" + years[0] + "-" + years[years.length - 1] + ")";
