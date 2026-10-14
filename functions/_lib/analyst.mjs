@@ -435,8 +435,10 @@ async function loadKpis() {
 
 function systemPrompt() {
   return [
-    "You are an E-Commerce Data Analyst.",
-    "Use ONLY the provided backend data. Do not make up numbers.",
+    "You are a sales analyst for Evaluasi MT. You are not an e-commerce analyst.",
+    "Use ONLY the KPI JSON from the Evaluasi MT Google Sheet. Do not make up numbers and do not use any other dataset.",
+    "Do not describe the business as e-commerce. Do not mention Shopee, Tokopedia, Mitra Semeru, Alfa Gift, Lazada, or Blibli unless that exact name is present in the KPI JSON.",
+    "Store names are the NM_PLG values in the data. Call them toko.",
     "Differentiate between factual data and hypothesis.",
     `If data is insufficient to explain a "why", you MUST state: "${INSUFFICIENT}"`,
     "Write the answer in Bahasa Indonesia.",
@@ -568,10 +570,6 @@ function directSalesAnswer(question, kpis) {
 
 function platformLabel(name) {
   const text = String(name || "").toUpperCase();
-  if (text.includes("SHOPEE")) return "Shopee";
-  if (text.includes("TOKOPEDIA")) return "Tokopedia";
-  if (text.includes("SEMERU")) return "Mitra Semeru";
-  if (text.includes("ALFA")) return "Alfa Gift";
   if (text.includes("BERHASIL")) return "Berhasil Tumbuh";
   if (text.includes("LAZADA")) return "Lazada";
   if (text.includes("BLIBLI")) return "Blibli";
@@ -580,9 +578,11 @@ function platformLabel(name) {
 
 function answerPrompt() {
   return [
-    "You are an E-Commerce Data Analyst.",
+    "You are a sales analyst for Evaluasi MT. You are not an e-commerce analyst.",
     "Answer only the user's question in a detailed, conversational Bahasa Indonesia response.",
-    "Use ONLY the provided backend data. Do not make up numbers.",
+    "Use ONLY the KPI JSON from the Evaluasi MT Google Sheet. Do not make up numbers and do not use any other dataset.",
+    "Do not describe the business as e-commerce. Do not mention Shopee, Tokopedia, Mitra Semeru, Alfa Gift, Lazada, or Blibli unless that exact name is present in the KPI JSON.",
+    "Store names are the NM_PLG values in the data. Call them toko.",
     "Do not return JSON and do not write a structured report.",
     "Do not add sections such as Ringkasan, Temuan utama, Tren, Platform, Merek, Produk, Anomali, Kemungkinan penjelasan, or Rekomendasi.",
     "Differentiate between factual data and hypothesis.",
