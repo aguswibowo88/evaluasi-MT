@@ -18,9 +18,12 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
     let growthText = "+" + growthPct + "%";
     let forecastTitle = "Forecast Sep 2026";
     const platforms = D.platforms || [];
+    for (let index = platforms.length - 1; index >= 0; index -= 1) {
+      if (isLegacyChannel(platforms[index].name)) platforms.splice(index, 1);
+    }
     const brands = D.brands || [];
 
-    if (D.top_platform) {
+    if (D.top_platform && !isLegacyChannel(D.top_platform.name)) {
       setText("topPlatformName", D.top_platform.name);
       setText("topPlatformValue", D.top_platform.label);
       setText("chipPlatform", D.top_platform.name + " · Lead Channel");
@@ -42,6 +45,7 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
     setText("brandCaption", brands.map((b) => b.name + " " + String(b.value_miliar).replace(".", ",") + "M").join(" · "));
     setText("sourceFile", D.source_file || "DATA E-COM.xlsx");
     (D.insights || []).forEach((item, i) => {
+      if (isLegacyChannel(item.title) || isLegacyChannel(item.body)) return;
       setText("insightTitle" + i, item.title);
       setText("insightBody" + i, item.body);
     });
@@ -329,12 +333,13 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
       });
     }
 
+    function isLegacyChannel(name) {
+      const text = String(name || "").toUpperCase();
+      return text.includes("SHOPEE") || text.includes("TOKOPEDIA") || text.includes("TOKPED") || text.includes("SEMERU") || text.includes("ALFA GIFT") || text.includes("ALFAGIFT");
+    }
+
     function platformShortName(name) {
       const text = String(name || "").toUpperCase();
-      if (text.includes("SHOPEE")) return "Shopee";
-      if (text.includes("TOKOPEDIA")) return "Tokopedia";
-      if (text.includes("SEMERU")) return "Mitra Semeru";
-      if (text.includes("ALFA")) return "Alfa Gift";
       if (text.includes("BERHASIL")) return "Berhasil Tumbuh";
       if (text.includes("LAZADA")) return "Lazada";
       if (text.includes("BLIBLI")) return "Blibli";
@@ -511,13 +516,23 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
         });
       });
       const brandAdded = brandAdd.get(2026) || [0, 0, 0, 0];
-      platformAdd.forEach((amount, name) => {
-        const platform = platforms.find((item) => item.name === name);
-        if (platform) platform.value += amount;
+      const liveTotals = new Map();
+      rows.forEach((row) => {
+        if (row.status !== "DIKIRIM" || isLegacyChannel(row.platform)) return;
+        const name = platformShortName(row.platform);
+        if (!name || isLegacyChannel(name)) return;
+        liveTotals.set(name, (liveTotals.get(name) || 0) + row.amount);
       });
-      const platformTotal = platforms.reduce((sum, item) => sum + item.value, 0);
-      platforms.forEach((item) => {
-        item.pct = platformTotal ? Math.round((item.value / platformTotal) * 100) : 0;
+      const rankedLive = [...liveTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+      platforms.length = 0;
+      const liveSum = rankedLive.reduce((sum, item) => sum + item[1], 0);
+      rankedLive.forEach(([name, value]) => {
+        platforms.push({
+          name,
+          full_name: name,
+          value,
+          pct: liveSum ? Math.round((value / liveSum) * 100) : 0,
+        });
       });
       const pctGap = 100 - platforms.reduce((sum, item) => sum + item.pct, 0);
       if (pctGap && platforms.length) platforms[0].pct += pctGap;
@@ -528,11 +543,6 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
         item.value_miliar = Math.round((item.value / 1e9) * 100) / 100;
         item.label = miliarLabel(item.value);
       });
-      if (D.top_platform && /shopee/i.test(D.top_platform.name)) {
-        D.top_platform.value += platformAdd.get("Shopee") || 0;
-        D.top_platform.label = miliarLabel(D.top_platform.value);
-        setText("topPlatformValue", D.top_platform.label);
-      }
       if (D.top_brand && /banana/i.test(D.top_brand.name)) {
         D.top_brand.value += brandAdded[0];
         D.top_brand.label = miliarLabel(D.top_brand.value);
@@ -707,7 +717,7 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
       const trendCanvas = document.getElementById("trendChart");
       if (trendCanvas) trendCanvas.setAttribute("aria-label", "Grafik tren penjualan historis dan prediksi " + nextMonthName + " " + nextYear);
 
-      const ytd = rows.filter((row) => row.status === "DIKIRIM" && row.year === latestYearNum && row.ym <= latestYm);
+      const ytd = rows.filter((row) => row.status === "DIKIRIM" && row.year === latestYearNum && row.ym <= latestYm && !isLegacyChannel(row.platform));
       const fullName = { Shopee: "PT. Shopee International", Tokopedia: "PT. Tokopedia", "Mitra Semeru": "PT. Mitra Semeru", "Alfa Gift": "Alfa Gift", "Berhasil Tumbuh": "Berhasil Tumbuh", Lazada: "Lazada", Blibli: "Blibli" };
       const topPlatform = topSum(ytd, (row) => platformShortName(row.platform));
       const topBrand = topSum(ytd, (row) => row.brand);
@@ -738,7 +748,8 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
       const juta = Math.round(forecastValue / 1e6).toLocaleString("id-ID");
       const itemName = topItem ? topItem[0] : "item unggulan";
       const move = growthPct >= 0 ? "lonjakan" : "pergerakan";
-      setText("insightBody0", "Alokasi Budget Marketing: Mengingat prediksi " + move + " omset ke Rp " + juta + " Juta di bulan " + nextMonthName + ", tingkatkan budget ads di Shopee khusus untuk produk " + itemName + ".");
+      const channelName = topPlatform ? (fullName[topPlatform[0]] || topPlatform[0]) : "kanal utama";
+      setText("insightBody0", "Alokasi Budget Marketing: Mengingat prediksi " + move + " omset ke Rp " + juta + " Juta di bulan " + nextMonthName + ", tingkatkan budget ads di " + channelName + " khusus untuk produk " + itemName + ".");
       const overlap = declines.filter((item) => item.overlap).map((item) => item.name);
       const overlapText = overlap.length ? " Utamakan " + overlap.join(", ") + ", karena item tersebut juga masuk daftar Top 10." : " Utamakan item yang ditandai latar merah, karena item tersebut juga masuk daftar Top 10.";
       setText("insightBody1", "Fokus Promosi Item Menurun: Arahkan program promosi ke item dengan tren penurunan penjualan." + overlapText);
@@ -746,9 +757,7 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
       const leaderValue = ranked.length ? ranked[ranked.length - 1][1] : 0;
       const weakest = ranked.find((item) => item[1] < leaderValue && item[1] >= leaderValue * 0.01);
       if (weakest) {
-        const tail = weakest[0] === "Mitra Semeru"
-          ? ", kanal aktif berikutnya dengan kinerja terendah setelah Tokopedia ditutup."
-          : ", kanal dengan omset tahun berjalan terendah di antara kanal yang masih aktif.";
+        const tail = ", kanal dengan omset tahun berjalan terendah di antara kanal yang masih aktif.";
         setText("insightTitle2", "Optimasi " + weakest[0]);
         setText("insightBody2", "Optimasi " + weakest[0] + ": Lakukan kampanye co-branding atau diskon khusus untuk menaikkan penetrasi pasar di " + weakest[0] + tail);
       }
@@ -759,16 +768,22 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
     }
 
     function renderRiskAssessment(rows, monthSums, latestYm, latestYear) {
-      const sentAll = rows.filter((row) => row.status === "DIKIRIM");
+      const sentAll = rows.filter((row) => row.status === "DIKIRIM" && !isLegacyChannel(row.platform));
       const byPlatform = topSumAll(sentAll, (row) => platformShortName(row.platform));
       const platformTotal = [...byPlatform.values()].reduce((sum, value) => sum + value, 0);
-      const shopee = byPlatform.get("Shopee") || 0;
-      const share = platformTotal ? Math.round((shopee / platformTotal) * 1000) / 10 : 0;
+      let leaderName = "";
+      let leaderValue = 0;
+      byPlatform.forEach((value, key) => {
+        if (isLegacyChannel(key) || value <= leaderValue) return;
+        leaderName = key;
+        leaderValue = value;
+      });
+      const share = platformTotal ? Math.round((leaderValue / platformTotal) * 1000) / 10 : 0;
       const gauge = document.getElementById("riskGauge");
       if (gauge) gauge.style.setProperty("--share", String(Math.max(0, Math.min(100, share))));
       const shareText = String(share).replace(".", ",");
       setText("riskShare", shareText + "%");
-      setText("riskPlatformText", "Shopee menguasai " + shareText + "% dari seluruh omset DIKIRIM. Ketergantungan ini adalah single point of failure: jika kanal ini terganggu, sebagian besar pendapatan berhenti. Diversifikasi ke Tokopedia dan platform lain mendesak, bukan opsional.");
+      if (leaderName) setText("riskPlatformText", leaderName + " menguasai " + shareText + "% dari seluruh omset DIKIRIM. Ketergantungan ini adalah single point of failure: jika kanal ini terganggu, sebagian besar pendapatan berhenti. Diversifikasi ke kanal lain mendesak, bukan opsional.");
 
       const byItemYear = new Map();
       rows.forEach((row) => {
@@ -881,7 +896,7 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
             if (String(line[statusIndex] || "").trim().toUpperCase() !== "DIKIRIM") return;
             const year = Number(line[yearIndex]);
             const platform = String(line[platformIndex] || "").trim();
-            if (!year || !platform) return;
+            if (!year || !platform || isLegacyChannel(platform)) return;
             if (!totals.has(platform)) totals.set(platform, new Map());
             const years = totals.get(platform);
             years.set(year, (years.get(year) || 0) + sheetAmount(line[revenueIndex]));
@@ -1006,8 +1021,10 @@ window.PRESENTATION_DATA = {"source_file": "Google Sheet evaluasi-mt", "top_plat
           table.slice(1).forEach((line) => {
             const year = Number(line[yearIndex]);
             if (!years.includes(year)) return;
-            const platform = platformShortName(String(line[platformIndex] || "").trim());
-            if (!platform) return;
+            const rawPlatform = String(line[platformIndex] || "").trim();
+            if (isLegacyChannel(rawPlatform)) return;
+            const platform = platformShortName(rawPlatform);
+            if (!platform || isLegacyChannel(platform)) return;
             if (!totals.has(platform)) totals.set(platform, new Map());
             const byYear = totals.get(platform);
             const current = byYear.get(year) || { sent: 0, all: 0 };
